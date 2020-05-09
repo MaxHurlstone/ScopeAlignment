@@ -138,8 +138,10 @@ class PyQtPlotter():
 
 
         self.s1 = pg.ScatterPlotItem(size=10, pen=pg.mkPen(None))
+        self.s2 = pg.PlotDataItem() #pg.ScatterPlotItem(size=10, pen=pg.mkPen("b", width=3))
         self.w1.setRange(xRange=[0,360], yRange=[0,90])
         self.w1.addItem(self.s1)
+        self.w1.addItem(self.s2)
 
 
         self.timer = QtCore.QTimer()
@@ -177,11 +179,15 @@ class PyQtPlotter():
         self.btn7.clicked.connect(self.btn7state)
         self.btn7.setCheckable(True)
         self.btn7.toggle()
+        self.btn8 = QtGui.QPushButton('Enter text command')
+        self.btn8.clicked.connect(self.btn8state)
+        self.btn8.setCheckable(True)
+
 
 
         self.text1 = QtGui.QLineEdit('moon/skyfield') #11767/star/10/loves.spenders.opened #moon/skyfield/60/loves.spenders.opened
         self.text1.textChanged.connect(self.text1changed)
-        self.text1.editingFinished.connect(self.enterPress)
+        # self.text1.editingFinished.connect(self.enterPress)
 
         ## Create a grid layout to manage the widgets size and position
         self.layout = QtGui.QGridLayout()
@@ -194,8 +200,9 @@ class PyQtPlotter():
         self.layout.addWidget(self.btn4, 4, 0)
         self.layout.addWidget(self.btn5, 5, 0)
         self.layout.addWidget(self.btn6, 6, 0)
-        self.layout.addWidget(self.btn7, 7, 0)   # button goes in upper-left
-        self.layout.addWidget(self.text1, 8, 0)   # text edit goes in middle-left
+        self.layout.addWidget(self.btn7, 7, 0)
+        self.layout.addWidget(self.btn8, 8, 0)   # button goes in upper-left
+        self.layout.addWidget(self.text1, 9, 0)   # text edit goes in middle-left
 
         ## Display the widget as a new window
         self.inputW.show()
@@ -437,6 +444,10 @@ class PyQtPlotter():
             print("Deactivating Kalman Filter")
             self.kalmanActive = False
 
+    def btn8state(self):
+        if self.btn7.isChecked():
+            print("Processing user input")
+            self.configureInfo(self.text)
 
 
     def text1changed(self, text):
@@ -444,35 +455,80 @@ class PyQtPlotter():
 
 
 
-    def enterPress(self):
-        self.input = self.text
-        self.configureInfo(self.input)
-
-        print(self.input)
+    # def enterPress(self):
+    #     self.input = self.text
+    #     self.configureInfo(self.input)
+    #
+    #     print(self.input)
 
 
 
     def configureInfo(self, input):
-        try:
-            target, type = input.split("/")
+        # try:
+        target, type = input.split("/")
 
-            self.target = target
-            self.type = type
+        self.target = target
+        self.type = type
 
-            print("Target set to: " + target + "(" + type + ")")
+        print("Target set to: " + target + "(" + type + ")")
 
-            self.lat = "51.989772 N"
-            self.lng = "0.213651 E"
+        self.lat = "51.989772 N"
+        self.lng = "0.213651 E"
 
-            #Confirm with message to user
-            print("Latitude: " + self.lat + "\nLongitude: " + self.lng)
+        #Confirm with message to user
+        print("Latitude: " + self.lat + "\nLongitude: " + self.lng)
 
-            self.location = self.earth + Topos(str(self.lat), str(self.lng))
-            self.targetSet = True
+        self.location = self.earth + Topos(str(self.lat), str(self.lng))
 
-        except Exception as e:
-            print("Error: " + str(e))
-            print("Probably something wrong with your input, try again")
+        #Drawing trace of objects daily motion
+        trace = np.empty((1,2))
+
+        if self.type == "skyfield":
+            try:
+                val = int(self.target)
+                target = self.data[int(self.target)]
+            except ValueError:
+                target = self.data[str(self.target)]
+
+        elif self.type == "star":
+            target = int(self.target)
+            target = Star.from_dataframe(self.df.loc[target])
+
+        now = datetime.datetime.now()
+
+        t0 = self.ts.utc(now.year, now.month, now.day)
+        t1 = self.ts.utc(now.year, now.month, now.day+1)
+        f = almanac.risings_and_settings(self.data, target, Topos(str(self.lat), str(self.lng)))
+        t, y = almanac.find_discrete(t0, t1, f)
+
+        for ti, yi in zip(t, y):
+            if yi:
+                riseTime = ti.utc_datetime()
+            else:
+                setTime = ti.utc_datetime()
+            # print(ti.utc_datetime(), 'Rise' if yi else 'Set')
+
+        t = riseTime
+        while t < setTime:
+            pos = self.calcAzAlt(self.ts.utc(t))
+            # print(np.shape([pos]))
+            # print(np.shape(trace))
+            trace = np.append(trace, [pos], axis=0)
+            t += datetime.timedelta(minutes=1)#hours = 1)
+
+        #print(trace)
+
+        self.w1.removeItem(self.s2)
+        self.s2 = pg.PlotDataItem(trace, pen=pg.mkPen("b", width=0.5))
+        #self.s2.setData(pos = trace) #, width = 3, color = "b") #, size = 4.0, pxMode = True, color=(1.0,1.0,1.0,1.0))#trace[:][0],trace[:][1])
+        self.w1.addItem(self.s2)
+
+
+        self.targetSet = True
+
+        # except Exception as e:
+        #     print("Error: " + str(e))
+        #     print("Probably something wrong with your input, try again")
 
 
 
@@ -490,7 +546,8 @@ class PyQtPlotter():
             astro = self.location.at(t).observe(target)
         elif self.type == "star":
             target = int(self.target)
-            astro = self.location.at(t).observe(Star.from_dataframe(self.df.loc[target]))
+            target = Star.from_dataframe(self.df.loc[target])
+            astro = self.location.at(t).observe(target)
 
         #Compute altitude and azimuth
         app = astro.apparent()
