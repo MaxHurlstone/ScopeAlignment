@@ -12,7 +12,7 @@ import plotting
 
 global sio
 global app
-sio = socketio.AsyncServer(cors_allowed_origins="https://192.168.1.77:80") # engineio_logger=True)
+sio = socketio.AsyncServer(cors_allowed_origins="https://138.38.244.80:80")# engineio_logger=True) #"https://192.168.1.77:80") # engineio_logger=True)
 app = web.Application()
 sio.attach(app)
 

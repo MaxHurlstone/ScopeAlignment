@@ -368,7 +368,7 @@ class PyQtPlotter():
         self.kf = KalmanFilter(transition_matrices = self.transMatrix,
                   observation_matrices = self.obsMatrix,
                   initial_state_mean = self.initStateMu,
-                  observation_covariance=100*self.kf.observation_covariance,
+                  observation_covariance=10*self.kf.observation_covariance,
                   em_vars=['transition_covariance', 'initial_state_covariance'])
 
         self.kf = self.kf.em(self.measurements, n_iter=5)
@@ -481,47 +481,46 @@ class PyQtPlotter():
         self.location = self.earth + Topos(str(self.lat), str(self.lng))
 
         #Drawing trace of objects daily motion
-        trace = np.empty((1,2))
-
-        if self.type == "skyfield":
-            try:
-                val = int(self.target)
-                target = self.data[int(self.target)]
-            except ValueError:
-                target = self.data[str(self.target)]
-
-        elif self.type == "star":
-            target = int(self.target)
-            target = Star.from_dataframe(self.df.loc[target])
-
-        now = datetime.datetime.now()
-
-        t0 = self.ts.utc(now.year, now.month, now.day)
-        t1 = self.ts.utc(now.year, now.month, now.day+1)
-        f = almanac.risings_and_settings(self.data, target, Topos(str(self.lat), str(self.lng)))
-        t, y = almanac.find_discrete(t0, t1, f)
-
-        for ti, yi in zip(t, y):
-            if yi:
-                riseTime = ti.utc_datetime()
-            else:
-                setTime = ti.utc_datetime()
-            # print(ti.utc_datetime(), 'Rise' if yi else 'Set')
-
-        t = riseTime
-        while t < setTime:
-            pos = self.calcAzAlt(self.ts.utc(t))
-            # print(np.shape([pos]))
-            # print(np.shape(trace))
-            trace = np.append(trace, [pos], axis=0)
-            t += datetime.timedelta(minutes=1)#hours = 1)
-
-        #print(trace)
-
-        self.w1.removeItem(self.s2)
-        self.s2 = pg.PlotDataItem(trace, pen=pg.mkPen("b", width=0.5))
-        #self.s2.setData(pos = trace) #, width = 3, color = "b") #, size = 4.0, pxMode = True, color=(1.0,1.0,1.0,1.0))#trace[:][0],trace[:][1])
-        self.w1.addItem(self.s2)
+        # trace = np.empty((1,2))
+        #
+        # if self.type == "skyfield":
+        #     try:
+        #         val = int(self.target)
+        #         target = self.data[int(self.target)]
+        #     except ValueError:
+        #         target = self.data[str(self.target)]
+        #
+        # elif self.type == "star":
+        #     target = int(self.target)
+        #     target = Star.from_dataframe(self.df.loc[target])
+        #
+        # now = datetime.datetime.now()
+        #
+        # t0 = self.ts.utc(now.year, now.month, now.day-1)
+        # t1 = self.ts.utc(now.year, now.month, now.day+1)
+        # f = almanac.risings_and_settings(self.data, target, Topos(str(self.lat), str(self.lng)))
+        # t, y = almanac.find_discrete(t0, t1, f)
+        #
+        # for ti, yi in zip(t, y):
+        #     if yi:
+        #         riseTime = ti.utc_datetime()
+        #     else:
+        #         setTime = ti.utc_datetime()
+        #     # print(ti.utc_datetime(), 'Rise' if yi else 'Set')
+        #
+        # t = riseTime
+        # while t < setTime:
+        #     pos = self.calcAzAlt(self.ts.utc(t))
+        #     # print(np.shape([pos]))
+        #     # print(np.shape(trace))
+        #     trace = np.append(trace, [pos], axis=0)
+        #     t += datetime.timedelta(minutes=1)#hours = 1)
+        #
+        # #print(trace)
+        #
+        # self.w1.removeItem(self.s2)
+        # self.s2 = pg.PlotDataItem(trace, pen=pg.mkPen("b", width=0.5))
+        # self.w1.addItem(self.s2)
 
 
         self.targetSet = True
